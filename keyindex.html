@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keystroke Analysis - Proctoring System</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --danger: #e74c3c;
+            --dark: #34495e;
+            --light: #f5f5f5;
+            --border-radius: 8px;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2 {
+            color: var(--dark);
+            margin-top: 0;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 25px;
+        }
+        
+        .typing-area {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: var(--border-radius);
+            resize: vertical;
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 12px 20px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        button.reset {
+            background-color: var(--danger);
+        }
+        
+        button.reset:hover {
+            background-color: #c0392b;
+        }
+        
+        .real-time-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f0f8ff;
+            border-radius: var(--border-radius);
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .keystroke-visualization {
+            height: 60px;
+            margin-top: 20px;
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+        }
+        
+        .keystroke-bar {
+            background-color: var(--primary);
+            width: 8px;
+            height: 20px;
+            transition: height 0.3s;
+        }
+        
+        .instructions {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .result-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Keystroke Analysis</h1>
+        <p class="subtitle">Type naturally to analyze your keystroke patterns</p>
+        
+        <div class="instructions">
+            <strong>Instructions:</strong> Type the requested text naturally. The system will analyze your typing patterns to verify your identity and detect anomalies.
+        </div>
+        
+        <div class="typing-area">
+            <textarea id="textInput" placeholder="Start typing here... Your keystroke patterns will be analyzed in real-time." spellcheck="false"></textarea>
+        </div>
+        
+        <div class="controls">
+            <button id="analyzeBtn" onclick="analyzeTyping()">Analyze Typing Pattern</button>
+            <button class="reset" onclick="resetAnalysis()">Reset</button>
+        </div>
+        
+        <div class="real-time-container">
+            <h3>Real-time Analysis</h3>
+            <div>
+                <span>Status: </span>
+                <span id="statusLabel">Waiting for input...</span>
+            </div>
+            <div style="margin-top: 10px;">
+                <span>Characters typed: </span>
+                <span id="charCount">0</span>
+            </div>
+            <div style="margin-top: 10px;">
+                <div>Typing rhythm:</div>
+                <div class="keystroke-visualization" id="keystrokeViz"></div>
+            </div>
+        </div>
+        
+        <div class="result-container" id="resultContainer" style="display: none;">
+            <h3>Analysis Result</h3>
+            <p id="result"></p>
+        </div>
+    </div>
+
+    <script>
+        // Keystroke analysis
+        let keyTimestamps = [];
+        let keyIntervals = [];
+        let realTimeStats = {
+            keyCount: 0,
+            lastTimestamp: null
+        };
+        
+        // Initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const textInput = document.getElementById('textInput');
+            textInput.addEventListener('keydown', logKeyDown);
+            textInput.addEventListener('input', updateRealTimeStats);
+        });
+        
+        // Log key press
+        function logKeyDown(event) {
+            const now = Date.now() / 1000;
+            
+            // Skip if it's a control key
+            if (event.key === 'Shift' || event.key === 'Control' || 
+                event.key === 'Alt' || event.key === 'Meta') {
+                return;
+            }
+            
+            // Record the timestamp
+            keyTimestamps.push(now);
+            
+            // Calculate interval between keystrokes
+            if (realTimeStats.lastTimestamp) {
+                const interval = now - realTimeStats.lastTimestamp;
+                keyIntervals.push(interval);
+                updateKeystrokeVisualization(interval);
+            }
+            
+            realTimeStats.lastTimestamp = now;
+            realTimeStats.keyCount++;
+        }
+        
+        function updateRealTimeStats() {
+            const textInput = document.getElementById('textInput');
+            const charCount = document.getElementById('charCount');
+            const statusLabel = document.getElementById('statusLabel');
+            
+            // Update character count
+            charCount.textContent = textInput.value.length;
+            
+            // Update status based on typing amount
+            if (textInput.value.length === 0) {
+                statusLabel.textContent = "Waiting for input...";
+            } else if (textInput.value.length < 20) {
+                statusLabel.textContent = "Keep typing...";
+            } else {
+                statusLabel.textContent = "Ready to analyze";
+            }
+        }
+        
+        function updateKeystrokeVisualization(interval) {
+            const viz = document.getElementById('keystrokeViz');
+            
+            // Cap the interval at 2 seconds for visualization purposes
+            const cappedInterval = Math.min(interval, 2);
+            const height = Math.max(5, Math.min(60, cappedInterval * 60));
+            
+            const bar = document.createElement('div');
+            bar.className = 'keystroke-bar';
+            bar.style.height = height + 'px';
+            
+            // Color based on timing
+            if (interval < 0.1) {
+                bar.style.backgroundColor = '#3498db'; // Fast - blue
+            } else if (interval < 0.3) {
+                bar.style.backgroundColor = '#2ecc71'; // Normal - green
+            } else if (interval < 0.7) {
+                bar.style.backgroundColor = '#f39c12'; // Slow - orange
+            } else {
+                bar.style.backgroundColor = '#e74c3c'; // Pause - red
+            }
+            
+            viz.appendChild(bar);
+            
+            // Keep only the most recent 50 bars
+            if (viz.children.length > 50) {
+                viz.removeChild(viz.children[0]);
+            }
+        }
+        
+        async function analyzeTyping() {
+            const textInput = document.getElementById('textInput');
+            const text = textInput.value;
+            const resultContainer = document.getElementById('resultContainer');
+            const resultElement = document.getElementById('result');
+            
+            if (text.length < 20) {
+                alert("Please type at least 20 characters for accurate analysis");
+                return;
+            }
+            
+            try {
+                // Send data to server
+                let response = await fetch("/analyze", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        text: text,
+                        timestamps: keyTimestamps
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
+                
+                let result = await response.json();
+                
+                // Display the results
+                resultContainer.style.display = 'block';
+                resultElement.textContent = `Speed: ${result.speed.toFixed(2)}s per key, Classification: ${result.classification}`;
+                
+            } catch (error) {
+                console.error("Error analyzing typing:", error);
+                alert("Error analyzing typing. Please try again.");
+            }
+        }
+        
+        function resetAnalysis() {
+            // Reset all data
+            keyTimestamps = [];
+            keyIntervals = [];
+            realTimeStats = {
+                keyCount: 0,
+                lastTimestamp: null
+            };
+            
+            // Clear text input
+            document.getElementById('textInput').value = '';
+            
+            // Reset displays
+            document.getElementById('charCount').textContent = '0';
+            document.getElementById('result').textContent = '';
+            document.getElementById('resultContainer').style.display = 'none';
+            
+            // Clear visualization
+            document.getElementById('keystrokeViz').innerHTML = '';
+            
+            // Reset status
+            const statusLabel = document.getElementById('statusLabel');
+            statusLabel.textContent = "Waiting for input...";
+        }
+    </script>
+</body>
+</html>
